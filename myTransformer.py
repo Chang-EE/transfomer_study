@@ -79,5 +79,53 @@ class EncoderBlock(nn.Module):
         # 2. FFN + Residual + Norm
         ffn_out = self.ffn(out1)
         out2 = self.resnorm2(out1, ffn_out)
-        print(f'''최종 결과: {out2}''')
+        print(f'''인코더 결과: {out2}''')
         return out2
+
+
+class MaskedSelfAttentionLayer(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        self.mha = nn.MultiheadAttention(d_model, num_heads, batch_first=True)
+    def forward(self, x, attn_mask=None):
+        attn_out, _ = self.mha(x, x, x, attn_mask=attn_mask)
+        print(f'''마스킹 어텐션: {attn_out}''')
+        return attn_out
+    
+class CrossAttentionLayer(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        self.mha = nn.MultiheadAttention(d_model, num_heads, batch_first=True)
+    def forward(self, q, k, v, key_padding_mask=None):
+        # q: 디코더 입력 (batch, tgt_seq_len, d_model)
+        # k, v: 인코더 출력 (batch, src_seq_len, d_model)
+        attn_out, _ = self.mha(q, k, v, key_padding_mask=key_padding_mask)
+        print(f'''크로스 어텐션: {attn_out}''')
+        return attn_out
+
+class DecoderBlock(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff):
+        super().__init__()
+        self.masked_self_attn = MaskedSelfAttentionLayer(d_model, num_heads)
+        self.resnorm1 = ResidualLayerNorm(d_model)
+        self.cross_attn = CrossAttentionLayer(d_model, num_heads)
+        self.resnorm2 = ResidualLayerNorm(d_model)
+        self.ffn = FeedForwardLayer(d_model, d_ff)
+        self.resnorm3 = ResidualLayerNorm(d_model)
+
+    def forward(self, x, enc_out=None, self_attn_mask=None, enc_key_padding_mask=None):
+        # 1. Masked Self-Attention + Residual + Norm
+        sa_out = self.masked_self_attn(x, attn_mask=self_attn_mask)
+        out1 = self.resnorm1(x, sa_out)
+        # 2. Cross Attention + Residual + Norm
+        if enc_out is not None:
+            ca_out = self.cross_attn(out1, enc_out, enc_out, key_padding_mask=enc_key_padding_mask)
+            out2 = self.resnorm2(out1, ca_out)
+        else:
+            out2 = out1
+        # 3. FFN + Residual + Norm
+        ffn_out = self.ffn(out2)
+        out3 = self.resnorm3(out2, ffn_out)
+        print(f'''디코더 결과: {out3}''')
+        return out3
+
