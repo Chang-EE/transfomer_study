@@ -1,0 +1,14 @@
+# 1. GitHub 최신 내용 먼저 가져오기 (충돌 방지)
+git pull
+
+# 2. 변경 확인
+git status
+
+# 3. 변경 스테이징
+git add .
+
+# 4. 커밋
+git commit -m "작업 내용"
+
+# 5. GitHub에 올리기
+git push
